@@ -10,17 +10,22 @@
 # pygithub==2.2.0
 # flask==3.0.3 
 
-langchain-google-genai==3.2.0
-langchain-pinecone==0.2.13
-langchain-community==0.4.1 
-langgraph==1.0.4
-pinecone-client==3.2.2
-python-telegram-bot==21.0
-python-dotenv==1.0.1
-pypdf==4.2.0
-tavily-python==0.3.1
-pygithub==2.2.0
-flask==3.0.3
+# --- Core Web & Server ---
+Flask
+gunicorn
+python-dotenv
 
-# --- RENDER PRODUCTION SERVER ---
-gunicorn==22.0.0
+# --- Bot & Utilities ---
+python-telegram-bot
+PyGithub
+pypdf
+tavily-python
+
+# --- AI & Database Stack ---
+# We remove version numbers to let pip resolve the complex dependency graph automatically.
+# This avoids the "ResolutionImpossible" error.
+langgraph
+langchain-google-genai
+langchain-pinecone
+langchain-community
+pinecone-client
