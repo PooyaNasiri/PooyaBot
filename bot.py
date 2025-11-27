@@ -124,7 +124,12 @@ def check_github_activity(query: str):
 # We use the raw Tavily tool directly so the LLM can search for ANYTHING (Weather, News, Pooya's LinkedIn)
 web_search_tool = TavilySearchResults(max_results=3)
 web_search_tool.name = "web_search"
-web_search_tool.description = "Use this to search the internet for live info (Weather, News) or public info about Pooya (LinkedIn/Instagram)."
+web_search_tool.description = """Use this to search the internet for live info (Weather, News, Map, etc) or public info about Pooya (LinkedIn/Instagram/Spotify).
+                              Pooya profiles are public, so feel free to look them up:
+                                - LinkedIn: https://www.linkedin.com/in/pooyanasiri
+                                - Instagram: https://www.instagram.com/pooyanasiri
+                                - Spotify: https://open.spotify.com/user/p007a
+                              """
 
 tools = [check_my_memory, check_github_activity, web_search_tool]
 
@@ -191,7 +196,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     **TOOL USAGE STRATEGY:**
     - **Step 1 (Memory):** Always use `check_my_memory` first. See if Pooya has actual past experiences, resume details, or specific opinions on the topic.
-    - **Step 2 (Live Info):** Use `web_search` if the user asks about the weather, current news, or wants to know what Pooya is up to on LinkedIn/Instagram.
+    - **Step 2 (Live Info):** Use `web_search` if the user asks about the weather, current news, or wants to know what Pooya is up to on LinkedIn/Instagram/Spotify.
     - **Step 3 (Code):** Use `check_github_activity` ONLY for questions about coding, repositories, or technical stacks.
 
     **THE "NEVER GIVE UP" RULE (CRITICAL):**
