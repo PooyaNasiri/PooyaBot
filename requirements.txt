@@ -10,8 +10,7 @@
 # pygithub==2.2.0
 # flask==3.0.3 
 
-
-langchain-google-genai==1.1.0
+langchain-google-genai==3.2.0
 langchain-pinecone==0.2.13
 langchain-community==0.4.1 
 langgraph==1.0.4
