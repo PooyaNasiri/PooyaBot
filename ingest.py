@@ -36,7 +36,4 @@ def ingest():
     print("--- Done! Your Digital Twin has learned. ---")
 
 if __name__ == "__main__":
-    # For local running, set keys here or in .env
-    # os.environ["PINECONE_API_KEY"] = "YOUR_PINECONE_KEY"
-    # os.environ["GOOGLE_API_KEY"] = "YOUR_GOOGLE_KEY"
     ingest()

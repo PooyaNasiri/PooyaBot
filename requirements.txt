@@ -10,13 +10,15 @@
 # pygithub==2.2.0
 # flask==3.0.3 
 
+pytz
+
 # --- Core Web & Server ---
 Flask
 gunicorn
 python-dotenv
 
 # --- Bot & Utilities ---
-python-telegram-bot
+python-telegram-bot[job-queue]==21.0
 PyGithub
 pypdf
 tavily-python

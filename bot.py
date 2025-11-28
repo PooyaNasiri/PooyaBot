@@ -1,10 +1,11 @@
 import os
 import logging
-import json
 from typing import TypedDict, Annotated, List
 from dotenv import load_dotenv
 import threading
 from flask import Flask
+import datetime
+import pytz
 
 # --- 1. SETUP & CONFIGURATION ---
 load_dotenv()
@@ -36,6 +37,7 @@ from telegram.ext import (
     ContextTypes,
     CommandHandler,
     MessageHandler,
+    JobQueue,
     filters,
 )
 from github import Github
@@ -167,6 +169,69 @@ workflow.add_edge("tools", "agent")
 
 app_graph = workflow.compile()
 
+
+# --- DAILY UPDATE JOB ---
+async def daily_update_callback(context: ContextTypes.DEFAULT_TYPE):
+    """Fetches tech news and sends the message."""
+    # NOTE: You MUST replace YOUR_CHAT_ID_HERE with your personal Telegram Chat ID.
+    # To get your chat ID, send /start to your bot once, and look at the bot's logs.
+    CHAT_ID = context.bot_data.get("main_chat_id", None)
+
+    if CHAT_ID is None:
+        # Failsafe if the bot hasn't stored the chat ID yet
+        logger.error("Daily update failed: Main Chat ID not set.")
+        return
+
+    # --- 1. Construct the AI prompt for synthesis ---
+    update_query = "What is the top 3 global tech news headlines right now? Respond in Pooya's usual sarcastic third-person persona."
+
+    # --- 2. Call the web_search tool ---
+    # We use the web_search tool directly to get the live data
+    search_result = web_search_tool.invoke(update_query)
+
+    # --- 3. Prepare full message for the Agent's Brain (LLM) ---
+    system_message = f"""You are Pooya Nasiri's AI Digital Twin. Your task is to synthesize the search result into a witty, sarcastic, and third-person daily report.
+
+    Rules:
+    1. **Persona:** Always speak as Pooya in the third person ("Pooya thinks...", "Pooya would say..."). Be humorous and sarcastic.
+    2. **Topic:** Daily Report on tech News.
+    3. **Context Data:** {search_result}
+    
+    Your response should be framed as a short 9 AM summary from Pooya.
+    """
+
+    # --- 4. Invoke the Agent (Single Turn) ---
+    messages = [
+        SystemMessage(content=system_message),
+        HumanMessage(
+            content="Generate the 9 AM daily summary based on the provided search context."
+        ),
+    ]
+
+    try:
+        # Run the agent to format the search results into Pooya's style
+        result = app_graph.invoke(
+            {"messages": messages}, config={"recursion_limit": 10}
+        )
+
+        # Robust Text Extraction (as finalized in previous steps)
+        final_message = result["messages"][-1]
+        bot_reply = (
+            final_message.content[0]["text"]
+            if isinstance(final_message.content, list) and final_message.content
+            else str(final_message.content)
+        )
+
+    except Exception as e:
+        logger.error(f"Error generating daily update: {e}")
+        bot_reply = (
+            "Pooya's morning alarm failed. Internal server error during news synthesis."
+        )
+
+    # --- 5. Send the message ---
+    await context.bot.send_message(chat_id=CHAT_ID, text=bot_reply)
+
+
 # --- 5. TELEGRAM HANDLERS ---
 
 
@@ -238,19 +303,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=chat_id, text=bot_reply)
 
 
-
-
 # --- 6. FLASK SERVER FOR CLOUD DEPLOYMENT ---
 app = Flask(__name__)
 
-@app.route('/')
+
+@app.route("/")
 def health_check():
     return "PooyaBot is running!", 200
+
 
 def run_flask():
     # Render assigns a port automatically via the 'PORT' env var
     port = int(os.environ.get("PORT", 8080))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host="0.0.0.0", port=port)
+
+
+async def save_chat_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Saves the user's chat ID to bot_data for scheduled messages."""
+    context.application.bot_data["main_chat_id"] = update.effective_chat.id
+    await update.message.reply_text(
+        "Chat ID saved. Pooya's daily news is now scheduled on 9AM everyday!"
+    )
+
 
 if __name__ == "__main__":
     # 1. Start the Flask Server in a background thread (Keep-Alive)
@@ -260,28 +334,29 @@ if __name__ == "__main__":
 
     # 2. Start the Telegram Bot (Main Process)
     application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-    
-    application.add_handler(CommandHandler("start", lambda u, c: c.bot.send_message(chat_id=u.effective_chat.id, text="Hi! I'm AI Pooya. Ask me anything.")))
-    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
 
-    print(f"✅ Pooya Bot is Online and Ready! (Listening on port {os.environ.get('PORT', 8080)})")
+    # Get JobQueue from the application
+    job_queue = application.job_queue
+
+    # Define your local timezone (Change 'Europe/Rome' to your exact city/region)
+    local_tz = pytz.timezone("Europe/Rome")
+    target_time = datetime.time(hour=9, minute=0, second=0, tzinfo=local_tz)
+
+    # Schedule the daily job
+    job_queue.run_daily(
+        daily_update_callback,
+        time=target_time,
+        days=(0, 1, 2, 3, 4, 5, 6),  # Every day
+        name="daily_news_update",
+    )
+
+    # Handlers
+    application.add_handler(CommandHandler("start", save_chat_id))  # Save ID on /start
+    application.add_handler(
+        MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message)
+    )
+
+    print(
+        f"✅ Pooya Bot is Online and Ready! (Listening on port {os.environ.get('PORT', 8080)})"
+    )
     application.run_polling()
-
-################### for local testing ####################
-# if __name__ == "__main__":
-#     application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-
-#     application.add_handler(
-#         CommandHandler(
-#             "start",
-#             lambda u, c: c.bot.send_message(
-#                 chat_id=u.effective_chat.id, text="Hi! I'm AI Pooya. Ask me anything."
-#             ),
-#         )
-#     )
-#     application.add_handler(
-#         MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message)
-#     )
-
-#     print("✅ Pooya Bot is Online and Ready!")
-#     application.run_polling()
